@@ -16,8 +16,8 @@ def load_and_split_data(filepath_movies,filepath_ratings, rating_scale=(0.5, 5.0
         testset: The test set in Surprise format.
     """
     
-    filepath_movies = './data/movies.csv'
-    filepath_ratings = './data/ratings.csv'
+    #filepath_movies = './data/movies.csv'
+    #filepath_ratings = './data/ratings.csv'
     
     # Load the data using pandas
     movies = pd.read_csv(filepath_movies)
@@ -35,6 +35,7 @@ def load_and_split_data(filepath_movies,filepath_ratings, rating_scale=(0.5, 5.0
 
     # Split the data into train and test sets
     trainset, testset = train_test_split(surprise_data, test_size=test_size, random_state=42)
+    print("Trainset and testset loaded successfully.")
 
     return trainset, testset
 
@@ -60,5 +61,6 @@ def load_data(filepath_movies,filepath_ratings):
     # Remove row with missing values
     movies.dropna(inplace=True)
     ratings.dropna(inplace=True)    
+    print("Movies and ratings datasets loaded successfully.")
 
     return movies, ratings

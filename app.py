@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 # Kafka configuration
 KAFKA_TOPIC = "movielogN"  # Set the topic name
-KAFKA_BROKER = "localhost:9092"  # Change if Kafka is on another host
+KAFKA_BROKER = "127.0.0.1:9092"  # Change if Kafka is on another host
 producer = Producer({'bootstrap.servers': KAFKA_BROKER}) ## Create a Kafka producer
 
 # Load the movies and ratings dataset
@@ -36,8 +36,6 @@ model = load_model(model_path)
 def home():
     return render_template('index.html')
 
-
-
 # API at /recommend/<int:user_id>
 @app.route("/recommend/<int:user_id>", methods=['GET'])
 def recomendation(user_id):
@@ -46,7 +44,8 @@ def recomendation(user_id):
         # Check if the user_id exists in the ratings DataFrame
         if user_id not in ratings['userId'].unique():
             return jsonify({'error': f"User ID {user_id} does not exist in the ratings dataset."}), 400
-        recommendations = recommend_movies(user_id, model, num_recommendations=10)
+        recommendations = recommend_movies(user_id, model, movies, ratings, num_recommendations=1)
+        #print(recommendations)        
         final_time = round((time.time() - start_time) * 1000, 2)  # Calculate latency ms
         # Create a log entry
         log_entry = {
@@ -57,10 +56,12 @@ def recomendation(user_id):
             "result": recommendations.to_dict(orient='records'),
             "responsetime": final_time,
         }
+        #print(log_entry)
         # Produce the log entry to Kafka
-        producer.produce(KAFKA_TOPIC, key=str(user_id), value=str(log_entry))
-        producer.flush()  # Ensure the message is sent
+        #producer.produce(KAFKA_TOPIC, key=str(user_id), value=str(log_entry))
+        #producer.flush()  # Ensure the message is sent
         return jsonify(recommendations.to_dict(orient='records')), 200
+           
     except Exception as e:
         # Log the error entry to Kafka  
         return jsonify({'error': 'Error in processing'}), 500
