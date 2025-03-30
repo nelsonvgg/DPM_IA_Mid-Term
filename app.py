@@ -1,38 +1,133 @@
-from flask import Flask, request, jsonify 
+from flask import Flask, render_template, request, jsonify 
+from confluent_kafka import Producer, Consumer, KafkaError, KafkaException
+import pickle
+import pandas as pd
+from surprise import Dataset, Reader
+import logging
+import time
+import os
+from load_data import load_data
+from predict import load_model, recommend_movies
 
-# Load data and models
+###### FLASK API ######
+app = Flask(__name__)
 
+# Kafka configuration
+KAFKA_TOPIC = "movielogN"  # Set the topic name
+KAFKA_BROKER = "localhost:9092"  # Change if Kafka is on another host
+producer = Producer({'bootstrap.servers': KAFKA_BROKER}) ## Create a Kafka producer
 
+# Load the movies and ratings dataset
+movies = "movies.csv"  
+ratings = "ratings.csv"
+data_path = "D:/GitHub/DPM_IA_Mid-Term/data/" 
+movies_path = os.path.join(data_path, "movies.csv")
+ratings_path = os.path.join(data_path, "ratings.csv")
+movies, ratings = load_data(movies_path, ratings_path)
 
-app = Flask(__name__, template_folder='templates')
+# Load the trained model from disk
+model_name = "SVD_model.pkl"  # The model filename
+models_path = "D:/GitHub/DPM_IA_Mid-Term/models/" 
+model_path = os.path.join(models_path, model_name)
+model = load_model(model_path)
+
 
 @app.route("/")
 def home():
     return render_template('index.html')
 
 
-# API at /api/v1/analysis/ 
-@app.route("/api/v1/analysis/", methods=['GET'])
-def analysis():
-    # Try to get the URI from the JSON
+
+# API at /recommend/<int:user_id>
+@app.route("/recommend/<int:user_id>", methods=['GET'])
+def recomendation(user_id):
+    start_time = time.time() # Start time for latency measurement
     try:
-        get_json = request.get_json()
-        image_uri = get_json['uri']
-    except:
-        return jsonify({'error': 'Missing URI in JSON'}), 400
-    
-    # Try to get the text from the image
-    try:
-        res = read_image(image_uri)
-        
-        response_data = {
-            "text": res
+        # Check if the user_id exists in the ratings DataFrame
+        if user_id not in ratings['userId'].unique():
+            return jsonify({'error': f"User ID {user_id} does not exist in the ratings dataset."}), 400
+        recommendations = recommend_movies(user_id, model, num_recommendations=10)
+        final_time = round((time.time() - start_time) * 1000, 2)  # Calculate latency ms
+        # Create a log entry
+        log_entry = {
+            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "userid": user_id,
+            "recommendation request": request.host,
+            "status": 200,
+            "result": recommendations.to_dict(orient='records'),
+            "responsetime": final_time,
         }
-    
-        return jsonify(response_data), 200
-    except:
+        # Produce the log entry to Kafka
+        producer.produce(KAFKA_TOPIC, key=str(user_id), value=str(log_entry))
+        producer.flush()  # Ensure the message is sent
+        return jsonify(recommendations.to_dict(orient='records')), 200
+    except Exception as e:
+        # Log the error entry to Kafka  
         return jsonify({'error': 'Error in processing'}), 500
 
-
+# @app.route("/recommend", methods=['POST'])
+# def process_recommendation_form():
+#     # Get form data submitted by the user
+#     user_id = request.form.get('user_id')
+#     num_recommendations = request.form.get('num_recommendations', 10)
+    
+#     # Convert to integers
+#     try:
+#         user_id = int(user_id)
+#         num_recommendations = int(num_recommendations)
+#     except ValueError:
+#         return jsonify({'error': 'User ID and Number of Recommendations must be integers'}), 400
+    
+#     # Start timing for latency measurement
+#     start_time = time.time()
+    
+#     try:
+#         # Check if the user_id exists in the ratings DataFrame
+#         if user_id not in ratings['userId'].unique():
+#             return jsonify({'error': f"User ID {user_id} does not exist in the ratings dataset."}), 400
+            
+#         # Generate recommendations
+#         recommendations = recommend_movies(user_id, model, num_recommendations=num_recommendations)
+        
+#         # Calculate response time
+#         final_time = round((time.time() - start_time) * 1000, 2)  # in milliseconds
+        
+#         # Create a log entry
+#         log_entry = {
+#             "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+#             "userid": user_id,
+#             "recommendation request": request.host,
+#             "status": 200,
+#             "num_recommendations": num_recommendations,
+#             "result": recommendations.to_dict(orient='records'),
+#             "responsetime": final_time,
+#         }
+        
+#         # Produce the log entry to Kafka
+#         producer.produce(KAFKA_TOPIC, key=str(user_id), value=str(log_entry))
+#         producer.flush()  # Ensure the message is sent
+        
+#         # Render a template with the recommendations
+#         return render_template(
+#             'recommendations.html', 
+#             recommendations=recommendations.to_dict(orient='records'),
+#             user_id=user_id,
+#             response_time=final_time
+#         )
+        
+#     except Exception as e:
+#         # Log the error entry to Kafka
+#         error_log = {
+#             "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+#             "userid": user_id,
+#             "recommendation request": request.host,
+#             "status": 500,
+#             "error": str(e)
+#         }
+#         producer.produce(KAFKA_TOPIC, key=str(user_id), value=str(error_log))
+#         producer.flush()
+        
+#         return jsonify({'error': f'Error in processing: {str(e)}'}), 500
+    
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=3000, debug=True)
+    app.run(host='0.0.0.0', port=8082, debug=True)

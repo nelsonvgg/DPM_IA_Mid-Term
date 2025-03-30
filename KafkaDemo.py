@@ -4,7 +4,7 @@ from json import dumps, loads
 from time import sleep
 from random import randint
 import random
-from kafka import KafkaConsumer, KafkaProducer
+from kafka import KafkaProducer
 
 def generate_log_entry():
     """Generate a log entry with expected consumer format."""
