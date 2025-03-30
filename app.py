@@ -44,7 +44,7 @@ def recomendation(user_id):
         # Check if the user_id exists in the ratings DataFrame
         if user_id not in ratings['userId'].unique():
             return jsonify({'error': f"User ID {user_id} does not exist in the ratings dataset."}), 400
-        recommendations = recommend_movies(user_id, model, movies, ratings, num_recommendations=1)
+        recommendations = recommend_movies(user_id, model, movies, ratings, num_recommendations=10)
         #print(recommendations)        
         final_time = round((time.time() - start_time) * 1000, 2)  # Calculate latency ms
         # Create a log entry
@@ -60,11 +60,20 @@ def recomendation(user_id):
         # Produce the log entry to Kafka
         #producer.produce(KAFKA_TOPIC, key=str(user_id), value=str(log_entry))
         #producer.flush()  # Ensure the message is sent
-        return jsonify(recommendations.to_dict(orient='records')), 200
+        #return jsonify(recommendations.to_dict(orient='records')), 200
+
+        # Return HTML instead of JSON
+        return render_template(
+            'recommendations.html', 
+            recommendations=recommendations.to_dict(orient='records'),
+            user_id=user_id,
+            response_time=final_time
+        )
            
     except Exception as e:
         # Log the error entry to Kafka  
-        return jsonify({'error': 'Error in processing'}), 500
+        #return jsonify({'error': 'Error in processing'}), 500
+        return render_template('error.html', error='Error in processing recommendation request'), 500
 
 # @app.route("/recommend", methods=['POST'])
 # def process_recommendation_form():
