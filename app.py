@@ -58,8 +58,8 @@ def recomendation(user_id):
         }
         #print(log_entry)
         # Produce the log entry to Kafka
-        #producer.produce(KAFKA_TOPIC, key=str(user_id), value=str(log_entry))
-        #producer.flush()  # Ensure the message is sent
+        producer.produce(KAFKA_TOPIC, key=str(user_id), value=str(log_entry))
+        producer.flush()  # Ensure the message is sent
         #return jsonify(recommendations.to_dict(orient='records')), 200
 
         # Return HTML instead of JSON
@@ -74,70 +74,6 @@ def recomendation(user_id):
         # Log the error entry to Kafka  
         #return jsonify({'error': 'Error in processing'}), 500
         return render_template('error.html', error='Error in processing recommendation request'), 500
-
-# @app.route("/recommend", methods=['POST'])
-# def process_recommendation_form():
-#     # Get form data submitted by the user
-#     user_id = request.form.get('user_id')
-#     num_recommendations = request.form.get('num_recommendations', 10)
-    
-#     # Convert to integers
-#     try:
-#         user_id = int(user_id)
-#         num_recommendations = int(num_recommendations)
-#     except ValueError:
-#         return jsonify({'error': 'User ID and Number of Recommendations must be integers'}), 400
-    
-#     # Start timing for latency measurement
-#     start_time = time.time()
-    
-#     try:
-#         # Check if the user_id exists in the ratings DataFrame
-#         if user_id not in ratings['userId'].unique():
-#             return jsonify({'error': f"User ID {user_id} does not exist in the ratings dataset."}), 400
-            
-#         # Generate recommendations
-#         recommendations = recommend_movies(user_id, model, num_recommendations=num_recommendations)
-        
-#         # Calculate response time
-#         final_time = round((time.time() - start_time) * 1000, 2)  # in milliseconds
-        
-#         # Create a log entry
-#         log_entry = {
-#             "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-#             "userid": user_id,
-#             "recommendation request": request.host,
-#             "status": 200,
-#             "num_recommendations": num_recommendations,
-#             "result": recommendations.to_dict(orient='records'),
-#             "responsetime": final_time,
-#         }
-        
-#         # Produce the log entry to Kafka
-#         producer.produce(KAFKA_TOPIC, key=str(user_id), value=str(log_entry))
-#         producer.flush()  # Ensure the message is sent
-        
-#         # Render a template with the recommendations
-#         return render_template(
-#             'recommendations.html', 
-#             recommendations=recommendations.to_dict(orient='records'),
-#             user_id=user_id,
-#             response_time=final_time
-#         )
-        
-#     except Exception as e:
-#         # Log the error entry to Kafka
-#         error_log = {
-#             "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-#             "userid": user_id,
-#             "recommendation request": request.host,
-#             "status": 500,
-#             "error": str(e)
-#         }
-#         producer.produce(KAFKA_TOPIC, key=str(user_id), value=str(error_log))
-#         producer.flush()
-        
-#         return jsonify({'error': f'Error in processing: {str(e)}'}), 500
     
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8082, debug=True)
